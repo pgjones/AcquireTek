@@ -15,8 +15,7 @@ class Tektronix(object):
         """ Initialise with a connection instance."""
         self._connection = connection
         self._connection.send("lock none") # Unlock
-        self._connection.send("*cls")
-        #self._connection.send("acquire:state off")
+        self._connection.send("*cls") # Clear the scope
         self._connection.send("*OPC?") # Will wait until scope is ready
         self._connection.send("verbose 1") # If the headers are on ensure they are verbose
         self._locked = False # Needs to be locked to acquire waveforms
@@ -24,7 +23,7 @@ class Tektronix(object):
         self._channels = {}
     def __del__(self):
         """ Free up the scope."""
-        self._connection.send("lock none") # Unlock
+        self._connection.send("lock none") # Unlock the front panel
     def interactive(self):
         """ Control the scope interactively."""
         if self._locked:
@@ -43,12 +42,13 @@ class Tektronix(object):
         return self._channels
     def lock(self):
         """ Get the current settings and allow no more changes."""
-        self._connection.send("header off")
+        self._connection.send("header off") # Turn all headers off
         self._connection.send("wfmpre:pt_fmt y") # Single point format
-        self._connection.send("data:encdg ribinary")
+        self._connection.send("data:encdg ribinary") # Signed int binary mode
         self._connection.send("acquire:mode sample") # Single acquisition mode, not average
-        self._connection.send("data:start 1")
-        self._connection.send("data:stop 100000") # 100000 is full 
+        #self._connection.send("data:start 1") # Start point
+        #self._connection.send("data:stop 100000") # 100000 is full 
+        print self._connection.ask("data?") # Ask for the data start/stop information
         self._find_active_channels()
         for channel in self._channels.keys():
             if self._channels[channel]:
@@ -58,17 +58,17 @@ class Tektronix(object):
     def unlock(self):
         """ Unlock and allow changes."""
         self._locked = False
-        self._connection.send("lock none")
+        self._connection.send("lock none") # Allow the front panel to be used
     def set_trigger(self, trigger_level, channel, falling=False):
         """ Set the trigger settings."""
-        self._conneciton.send("trigger:a:type edge")
-        self._connection.send("trigger:a:mode normal")
-        self._connection.send("trigger:a:level %d" % trigger_level)
-        self._connection.send("trigger:a:edge:coupling dc")
+        self._conneciton.send("trigger:a:type edge") # Chose the edge trigger
+        self._connection.send("trigger:a:mode normal") # Normal mode (waits for a trigger)
+        self._connection.send("trigger:a:level %d" % trigger_level) # Sets the trigger level in Volts
+        self._connection.send("trigger:a:edge:coupling dc") # DC coupling
         if falling:
-            self._connection.send("trigger:a:edge:slope fall")
+            self._connection.send("trigger:a:edge:slope fall") # Falling or ...
         else:
-            self._connection.send("trigger:a:edge:slope rise")
+            self._connection.send("trigger:a:edge:slope rise") # ... rising slope
         self._connection.send("trigger:a:edge:source ch%i" % channel)
     def acquire(self):
         """ Wait until scope triggers."""
@@ -82,8 +82,8 @@ class Tektronix(object):
         """ Acquire a waveform from channel=channel."""
         if self._locked == False or self._channels[channel] == False:
             raise Exception("Not locked or channel not active.")
-        self._connection.send("data:source ch%i" % channel)
-        data = self._connection.ask("curve?")
+        self._connection.send("data:source ch%i" % channel) # Set the data source to the channel
+        data = self._connection.ask("curve?") # Ask for the data
         header_len = 2 + int(data[1])
         waveform = numpy.fromstring(data[header_len:], self._data_type)
         # Now convert the waveform into voltage units
@@ -128,14 +128,14 @@ class Tektronix(object):
                            'HDELAY' : float,
                            'COMPOSITION': str,
                            'FILTERFREQ' : int }
-        self._connection.send("header on")
-        self._connection.send("data:source ch%i" % channel)
+        self._connection.send("header on") # Turn headers on
+        self._connection.send("data:source ch%i" % channel) # Set the source
         preamble = {}
-        for preamble_setting in self._connection.ask("wfmpre?").strip()[8:].split(';'):
+        for preamble_setting in self._connection.ask("wfmpre?").strip()[8:].split(';'): # Ask for waveform information
             key, value = preamble_setting.split(' ',1)
             preamble[key] = preamble_fields[key](value) # Conver the value to the correct field type 
         self._preamble[channel] = preamble
-        self._connection.send("header off")
+        self._connection.send("header off") # Turn the headers offf
         # Now set the data type
         if self._preamble[channel]['BYT_OR'] == 'MSB':
             self._data_type = '>'
