@@ -7,13 +7,18 @@
 # Author P G Jones - 28/05/2013 <p.g.jones@qmul.ac.uk> : First revision
 #################################################################################################### 
 from pyvisa.vpp43 import visa_library, visa_exceptions
-visa_library.load_library("/Library/Frameworks/Visa.framework/VISA")
+visa_library.load_library("/Library/Frameworks/Visa.framework/VISA") # Mac specific??
 import visa
 
 class VisaUSB(object):
     """ Connect via visa/usb."""
     def __init__(self):
-        self._connection = visa.instrument(visa.get_instruments_list()[0])
+        """ Try the default connection."""
+        for instrument in visa.get_instruments_list():
+            if instrument[0:3] == "USB":
+                self._connection = visa.instrument(instrument)
+                print "Connecting to", instrument
+                print self.ask("*idn?") # Ask the scope for its identity
     def send(self, command):
         """ Send a command, doesn't expect a returned result."""
         self._connection.write(command)

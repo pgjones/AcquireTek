@@ -15,7 +15,8 @@ class Tektronix(object):
         """ Initialise with a connection instance."""
         self._connection = connection
         self._connection.send("lock none") # Unlock
-        self._connection.send("acq:state off")
+        self._connection.send("*cls")
+        #self._connection.send("acquire:state off")
         self._connection.send("*OPC?") # Will wait until scope is ready
         self._connection.send("verbose 1") # If the headers are on ensure they are verbose
         self._locked = False # Needs to be locked to acquire waveforms
@@ -44,18 +45,43 @@ class Tektronix(object):
         """ Get the current settings and allow no more changes."""
         self._connection.send("header off")
         self._connection.send("wfmpre:pt_fmt y") # Single point format
+        self._connection.send("data:encdg ribinary")
+        self._connection.send("acquire:mode sample") # Single acquisition mode, not average
+        self._connection.send("data:start 1")
+        self._connection.send("data:stop 100000") # 100000 is full 
         self._find_active_channels()
         for channel in self._channels.keys():
             if self._channels[channel]:
                 self._get_preamble(channel)
         self._locked = True
+        self._connection.send("lock all") # Prevent people channing the settings via the front panel
     def unlock(self):
         """ Unlock and allow changes."""
         self._locked = False
+        self._connection.send("lock none")
+    def set_trigger(self, trigger_level, channel, falling=False):
+        """ Set the trigger settings."""
+        self._conneciton.send("trigger:a:type edge")
+        self._connection.send("trigger:a:mode normal")
+        self._connection.send("trigger:a:level %d" % trigger_level)
+        self._connection.send("trigger:a:edge:coupling dc")
+        if falling:
+            self._connection.send("trigger:a:edge:slope fall")
+        else:
+            self._connection.send("trigger:a:edge:slope rise")
+        self._connection.send("trigger:a:edge:source ch%i" % channel)
+    def acquire(self):
+        """ Wait until scope triggers."""
+        self._connection.send("acquire:state run") # Equivalent to on
+        self._connection.send("acquire:stopafter sequence") # Stop acquiring after one acquisiton
+        # Wait until acquiring and there is a trigger
+        while int(self._connection.ask("acquire:state?")) == 0 or \
+                self._connection.ask("trigger:state?") == "READY": 
+            pass
     def get_waveform(self, channel):
         """ Acquire a waveform from channel=channel."""
-        if self._locked == False:
-            raise Exception("Not locked.")
+        if self._locked == False or self._channels[channel] == False:
+            raise Exception("Not locked or channel not active.")
         self._connection.send("data:source ch%i" % channel)
         data = self._connection.ask("curve?")
         header_len = 2 + int(data[1])
