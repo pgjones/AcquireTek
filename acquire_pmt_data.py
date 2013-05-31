@@ -15,7 +15,7 @@ import time
 usb_conn = scope_connections.VisaUSB()
 tek_scope = scopes.TektronixMSO2000(usb_conn)
 tek_scope.lock()
-tek_scope.set_trigger(-200e-3, 1, True) # -200 mV level
+tek_scope.set_trigger(0.5, 1, True) # -200 mV level
 c1 = ROOT.TCanvas()
 for acquisition in range(0, 100):
     t0 = time.time()

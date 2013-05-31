@@ -21,8 +21,8 @@ class TektronixMSO2000(object):
         self._locked = False # Needs to be locked to acquire waveforms
         self._preamble = {}
         self._channels = {}
-        self._data_start = 45000 # Min is 1
-        self._data_stop  = 55000 # Max is 100000
+        self._data_start = 49000 # Min is 1
+        self._data_stop  = 51000 # Max is 100000
     def __del__(self):
         """ Free up the scope."""
         self._connection.send("lock none") # Unlock the front panel
@@ -65,13 +65,15 @@ class TektronixMSO2000(object):
         """ Set the trigger settings."""
         self._connection.send("trigger:a:type edge") # Chose the edge trigger
         self._connection.send("trigger:a:mode normal") # Normal mode (waits for a trigger)
-        self._connection.send("trigger:a:level %d" % trigger_level) # Sets the trigger level in Volts
+        self._connection.send("trigger:a:edge:source ch%i" % channel)
         self._connection.send("trigger:a:edge:coupling dc") # DC coupling
         if falling:
             self._connection.send("trigger:a:edge:slope fall") # Falling or ...
         else:
             self._connection.send("trigger:a:edge:slope rise") # ... rising slope
-        self._connection.send("trigger:a:edge:source ch%i" % channel)
+        self._connection.send("trigger:a:level %f" % trigger_level) # Sets the trigger level in Volts
+        self._connection.send("trigger:a:level:ch1 %f" % trigger_level) # Sets the trigger level in Volts
+        self._connection.ask("*opc?")
     def acquire(self):
         """ Wait until scope triggers."""
         self._connection.send("acquire:state run") # Equivalent to on
