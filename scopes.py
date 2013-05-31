@@ -50,7 +50,6 @@ class TektronixMSO2000(object):
         self._connection.send("acquire:mode sample") # Single acquisition mode, not average
         self._connection.send("data:start %i" % self._data_start) # Start point
         self._connection.send("data:stop %i" % self._data_stop) # 100000 is full 
-        print self._connection.ask("data?") # Ask for the data start/stop information
         self._find_active_channels()
         for channel in self._channels.keys():
             if self._channels[channel]:
