@@ -18,7 +18,7 @@ class VisaUSB(object):
             if instrument[0:3] == "USB":
                 self._connection = visa.instrument(instrument)
                 print "Connecting to", instrument
-                print self.ask("*idn?") # Ask the scope for its identity
+                print "Which has identity:", self.ask("*idn?") # Ask the scope for its identity
     def send(self, command):
         """ Send a command, doesn't expect a returned result."""
         self._connection.write(command)

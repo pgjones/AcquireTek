@@ -9,7 +9,7 @@
 import re
 import numpy
 
-class Tektronix(object):
+class TektronixMSO2000(object):
     """ Communication with a tektronix scope."""
     def __init__(self, connection):
         """ Initialise with a connection instance."""
@@ -21,6 +21,8 @@ class Tektronix(object):
         self._locked = False # Needs to be locked to acquire waveforms
         self._preamble = {}
         self._channels = {}
+        self._data_start = 45000 # Min is 1
+        self._data_stop  = 55000 # Max is 100000
     def __del__(self):
         """ Free up the scope."""
         self._connection.send("lock none") # Unlock the front panel
@@ -46,8 +48,8 @@ class Tektronix(object):
         self._connection.send("wfmpre:pt_fmt y") # Single point format
         self._connection.send("data:encdg ribinary") # Signed int binary mode
         self._connection.send("acquire:mode sample") # Single acquisition mode, not average
-        #self._connection.send("data:start 1") # Start point
-        #self._connection.send("data:stop 100000") # 100000 is full 
+        self._connection.send("data:start %i" % self._data_start) # Start point
+        self._connection.send("data:stop %i" % self._data_stop) # 100000 is full 
         print self._connection.ask("data?") # Ask for the data start/stop information
         self._find_active_channels()
         for channel in self._channels.keys():
@@ -61,7 +63,7 @@ class Tektronix(object):
         self._connection.send("lock none") # Allow the front panel to be used
     def set_trigger(self, trigger_level, channel, falling=False):
         """ Set the trigger settings."""
-        self._conneciton.send("trigger:a:type edge") # Chose the edge trigger
+        self._connection.send("trigger:a:type edge") # Chose the edge trigger
         self._connection.send("trigger:a:mode normal") # Normal mode (waits for a trigger)
         self._connection.send("trigger:a:level %d" % trigger_level) # Sets the trigger level in Volts
         self._connection.send("trigger:a:edge:coupling dc") # DC coupling
@@ -73,11 +75,10 @@ class Tektronix(object):
     def acquire(self):
         """ Wait until scope triggers."""
         self._connection.send("acquire:state run") # Equivalent to on
-        self._connection.send("acquire:stopafter sequence") # Stop acquiring after one acquisiton
         # Wait until acquiring and there is a trigger
         while int(self._connection.ask("acquire:state?")) == 0 or \
                 self._connection.ask("trigger:state?") == "READY": 
-            pass
+            print int(self._connection.ask("acquire:state?")), self._connection.ask("trigger:state?")
     def get_waveform(self, channel):
         """ Acquire a waveform from channel=channel."""
         if self._locked == False or self._channels[channel] == False:
@@ -88,9 +89,9 @@ class Tektronix(object):
         waveform = numpy.fromstring(data[header_len:], self._data_type)
         # Now convert the waveform into voltage units
         waveform = self._preamble[channel]['YZERO'] + (waveform - self._preamble[channel]['YOFF']) * self._preamble[channel]['YMULT']
-        # Now build the relevant timing array
-        timeform = self._preamble[channel]['XZERO'] + (numpy.arange(self._preamble[channel]['NR_PT']) - self._preamble[channel]['PT_OFF']) * \
-            self._preamble[channel]['XINCR']
+        # Now build the relevant timing array correcting for data portion acquired
+        timeform = self._preamble[channel]['XZERO'] + self._data_start * self._preamble[channel]['XINCR'] + \
+            (numpy.arange(self._preamble[channel]['NR_PT']) - self._preamble[channel]['PT_OFF']) * self._preamble[channel]['XINCR']
         return (timeform, waveform)
 #################################################################################################### 
     def _find_active_channels(self):
