@@ -16,13 +16,13 @@ class TektronixMSO2000(object):
         self._connection = connection
         self._connection.send("lock none") # Unlock
         self._connection.send("*cls") # Clear the scope
-        self._connection.send("*OPC?") # Will wait until scope is ready
+        self._connection.send("*opc?") # Will wait until scope is ready
         self._connection.send("verbose 1") # If the headers are on ensure they are verbose
         self._locked = False # Needs to be locked to acquire waveforms
         self._preamble = {}
         self._channels = {}
-        self._data_start = 49000 # Min is 1
-        self._data_stop  = 51000 # Max is 100000
+        self._data_start = 49500 # Min is 1
+        self._data_stop  = 50500 # Max is 100000
     def __del__(self):
         """ Free up the scope."""
         self._connection.send("lock none") # Unlock the front panel
@@ -86,6 +86,8 @@ class TektronixMSO2000(object):
             raise Exception("Not locked or channel not active.")
         self._connection.send("data:source ch%i" % channel) # Set the data source to the channel
         data = self._connection.ask("curve?") # Ask for the data
+        if data is None:
+            raise Exception
         header_len = 2 + int(data[1])
         waveform = numpy.fromstring(data[header_len:], self._data_type)
         # Now convert the waveform into voltage units
