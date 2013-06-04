@@ -9,23 +9,38 @@
 import re
 import numpy
 
-class TektronixMSO2000(object):
-    """ Communication with a tektronix scope."""
+class Tektronix(object):
+    """ Base class for tektronix scopes."""
+    _preamble_fields = {'BYT_NR' : int, # data width for waveform
+                        'BIT_NR' : int, # number of bits per waveform point
+                        'ENCDG'  : str, # encoding of waveform (binary/ascii)
+                        'BN_FMT' : str, # binary format of waveform
+                        'BYT_OR' : str, # ordering of waveform data bytes (LSB/MSB)
+                        'NR_PT'  : int, # record length of record waveform
+                        'PT_FMT' : str, # Point format (Y/ENV)
+                        'XUNIT'  : str, # X unit 
+                        'XINCR'  : float, # Difference between two x points
+                        'XZERO'  : float, # X zero value
+                        'PT_OFF' : int, # Ignored?
+                        'YUNIT'  : str, # Y unit
+                        'YMULT'  : float, # Difference between two y point
+                        'YOFF'   : float, # Y offset
+                        'YZERO'  : float } # Y zero value
     def __init__(self, connection):
-        """ Initialise with a connection instance."""
+        """ Initialise the scope with a connection to the scope."""
+        # Initiliase setttings to nothing
+        self._preamble = {}
+        self._channels = {} 
         self._connection = connection
-        self._connection.send("lock none") # Unlock
+        self._connection.send("lock none") # Unlock the front panel
         self._connection.send("*cls") # Clear the scope
         self._connection.send("*opc?") # Will wait until scope is ready
         self._connection.send("verbose 1") # If the headers are on ensure they are verbose
-        self._locked = False # Needs to be locked to acquire waveforms
-        self._preamble = {}
-        self._channels = {}
-        self._data_start = 49500 # Min is 1
-        self._data_stop  = 50500 # Max is 100000
+        self._locked = False # Local locking of scope settings
     def __del__(self):
         """ Free up the scope."""
         self._connection.send("lock none") # Unlock the front panel
+#################################################################################################### 
     def interactive(self):
         """ Control the scope interactively."""
         if self._locked:
@@ -38,29 +53,39 @@ class TektronixMSO2000(object):
         except KeyboardInterrupt:
             print "Exit: Interative mode."
     def get_active_channels(self):
-        """ Return the number of interactive channels."""
+        """ Return the number of active channels."""
         if not self._locked:
             self._find_active_channels()
         return self._channels
+    def get_waveform_units(self, channel):
+        """ Return the unit strings for the waveform."""
+        if not self._locked:
+            self._get_preamble(channel)
+        return (self._preamble[channel]['XUNIT'], self._preamble[channel]['YUNIT'])
     def lock(self):
         """ Get the current settings and allow no more changes."""
+        self._connection.send("lock all") # Prevent people channing the settings via the front panel
         self._connection.send("header off") # Turn all headers off
-        self._connection.send("wfmpre:pt_fmt y") # Single point format
-        self._connection.send("data:encdg ribinary") # Signed int binary mode
-        self._connection.send("acquire:mode sample") # Single acquisition mode, not average
-        self._connection.send("data:start %i" % self._data_start) # Start point
-        self._connection.send("data:stop %i" % self._data_stop) # 100000 is full 
         self._find_active_channels()
         for channel in self._channels.keys():
             if self._channels[channel]:
                 self._get_preamble(channel)
         self._locked = True
-        self._connection.send("lock all") # Prevent people channing the settings via the front panel
+        self._connection.ask("*opc?") # Wait unti scope is ready
     def unlock(self):
         """ Unlock and allow changes."""
         self._locked = False
         self._connection.send("lock none") # Allow the front panel to be used
-    def set_trigger(self, trigger_level, channel, falling=False):
+    def set_single_acquisition(self):
+        """ Set the scope in single acquisition mode."""
+        self._connection.send("acquire:mode sample") # Single acquisition mode, not average
+        self._connection.ask("*opc?") # Wait unti scope is ready
+    def set_average_acquisition(self, averages):
+        """ Set the scope in average acquisition mode."""
+        self._connection.send("acquire:mode average")
+        self._connection.send("acquire::numavg %i" % averages)
+        self._connection.ask("*opc?") # Wait unti scope is ready
+    def set_edge_trigger(self, trigger_level, channel, falling=False):
         """ Set the trigger settings."""
         self._connection.send("trigger:a:type edge") # Chose the edge trigger
         self._connection.send("trigger:a:mode normal") # Normal mode (waits for a trigger)
@@ -72,13 +97,18 @@ class TektronixMSO2000(object):
             self._connection.send("trigger:a:edge:slope rise") # ... rising slope
         self._connection.send("trigger:a:level %f" % trigger_level) # Sets the trigger level in Volts
         self._connection.send("trigger:a:level:ch1 %f" % trigger_level) # Sets the trigger level in Volts
-        self._connection.ask("*opc?")
-    def acquire(self):
-        """ Wait until scope triggers."""
+        self._connection.ask("*opc?") # Wait unti scope is ready
+    def set_data_mode(self, data_start=1, data_stop=100000):
+        """ Set the settings for the data returned by the scope."""
+        self._connection.send("wfmpre:pt_fmt y") # Single point format
+        self._connection.send("data:encdg ribinary") # Signed int binary mode
+        self._connection.send("data:start %i" % data_start) # Start point
+        self._connection.send("data:stop %i" % data_stop) # 100000 is full 
+    def acquire(self, triggered=True):
+        """ Wait until scope has an acquisition and optionally has triggered."""
         self._connection.send("acquire:state run") # Equivalent to on
         # Wait until acquiring and there is a trigger
-        while int(self._connection.ask("acquire:state?")) == 0 or \
-                self._connection.ask("trigger:state?") == "READY": 
+        while int(self._connection.ask("acquire:state?")) == 0 or (triggered and self._connection.ask("trigger:state?") == "READY"): 
             print int(self._connection.ask("acquire:state?")), self._connection.ask("trigger:state?")
     def get_waveform(self, channel):
         """ Acquire a waveform from channel=channel."""
@@ -87,16 +117,16 @@ class TektronixMSO2000(object):
         self._connection.send("data:source ch%i" % channel) # Set the data source to the channel
         data = self._connection.ask("curve?") # Ask for the data
         if data is None:
-            raise Exception
+            raise Exception("Scope has errored.")
         header_len = 2 + int(data[1])
-        waveform = numpy.fromstring(data[header_len:], self._data_type)
+        waveform = numpy.fromstring(data[header_len:], self._get_data_type(channel))
         # Now convert the waveform into voltage units
         waveform = self._preamble[channel]['YZERO'] + (waveform - self._preamble[channel]['YOFF']) * self._preamble[channel]['YMULT']
         # Now build the relevant timing array correcting for data portion acquired
         timeform = self._preamble[channel]['XZERO'] + self._data_start * self._preamble[channel]['XINCR'] + \
             (numpy.arange(self._preamble[channel]['NR_PT']) - self._preamble[channel]['PT_OFF']) * self._preamble[channel]['XINCR']
         return (timeform, waveform)
-#################################################################################################### 
+#### Internal ###################################################################################### 
     def _find_active_channels(self):
         """ Finds out how many channels are active."""
         self._connection.send("header on")
@@ -108,45 +138,55 @@ class TektronixMSO2000(object):
                 self._channels[channel] = state
         self._connection.send("header off")
     def _get_preamble(self, channel):
-        """ Get the waveform data type preamble."""
-        preamble_fields = {'BYT_NR' : int, # data width for waveform
-                           'BIT_NR' : int, # number of bits per waveform point
-                           'ENCDG'  : str, # encoding of waveform (binary/ascii)
-                           'BN_FMT' : str, # binary format of waveform
-                           'BYT_OR' : str, # ordering of waveform data bytes (LSB/MSB)
-                           'WFID'   : str, # Description of the data
-                           'NR_PT'  : int, # record length of record waveform
-                           'PT_FMT' : str, # Point format (Y/ENV)
-                           'XUNIT'  : str,
-                           'XINCR'  : float,
-                           'XZERO'  : float,
-                           'PT_OFF' : int,
-                           'YUNIT'  : str,
-                           'YMULT'  : float,
-                           'YOFF'   : float,
-                           'YZERO'  : float,
-                           'VSCALE' : float, 
-                           'HSCALE' : float, 
-                           'VPOS'   : float,
-                           'VOFFSET': float,
-                           'HDELAY' : float,
-                           'COMPOSITION': str,
-                           'FILTERFREQ' : int }
+        """ Retrieve the preamble from the scope."""
         self._connection.send("header on") # Turn headers on
         self._connection.send("data:source ch%i" % channel) # Set the source
         preamble = {}
         for preamble_setting in self._connection.ask("wfmpre?").strip()[8:].split(';'): # Ask for waveform information
             key, value = preamble_setting.split(' ',1)
-            preamble[key] = preamble_fields[key](value) # Conver the value to the correct field type 
+            if key in preamble.keys():
+                preamble[key] = preamble_fields[key](value) # Conver the value to the correct field type 
+            else:
+                print "Preamble key", key, "is ignored."
         self._preamble[channel] = preamble
         self._connection.send("header off") # Turn the headers offf
-        # Now set the data type
-        if self._preamble[channel]['BYT_OR'] == 'MSB':
-            self._data_type = '>'
+    def _get_data_type(self, channel):
+        """ Return the data type for the given channel."""
+        data_type = ""
+        if self._preamble[channel]['BYT_OR'] == 'MSB': # Endeaness
+            data_type = '>'
         else:
-            self._data_type = '<'
-        if self._preamble[channel]['BN_FMT'] == 'RI':
-            self._data_type += 'i'
+            data_type = '<'
+        if self._preamble[channel]['BN_FMT'] == 'RI': # Signed or unsigned
+            data_type += 'i'
         else:
-            self._data_type += 'u'
-        self._data_type += str(self._preamble[channel]['BYT_NR'])
+            data_type += 'u'
+        data_type += str(self._preamble[channel]['BYT_NR']) # Number of bits per data point
+        return data_type
+                        
+class Tektronix2000(object):
+    """ Specific commands for the DPO/MSO 2000 series scopes."""
+    # Update the preamble fields with those specific to this scope model                    
+    Tektronix._preamble_fields.update( { 'WFID'   : str, # Description of the data
+                                         'VSCALE' : float, 
+                                         'HSCALE' : float, 
+                                         'VPOS'   : float,
+                                         'VOFFSET': float,
+                                         'HDELAY' : float,
+                                         'COMPOSITION': str,
+                                         'FILTERFREQ' : int } )
+    def __init__(self, connection):
+        """ Intialise the scope with a connection."""
+        super(Tektronix3000, self).__init__(connection)
+
+class Tektronix3000(object):
+    """ Specific commands for the DPO/MSO 2000 series scopes."""
+    # Update the preamble fields with those specific to this scope model                    
+    Tektronix._preamble_fields.update( { 'CENTERFREQUENCY' : float,
+                                         'DOMAIN'          : str, 
+                                         'REFLEVEL'        : float,
+                                         'SPAN'            : float,
+                                         'WFMTYPE'         : str } )
+    def __init__(self, connection):
+        """ Intialise the scope with a connection."""
+        super(Tektronix3000, self).__init__(connection)

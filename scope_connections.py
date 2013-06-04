@@ -6,9 +6,13 @@
 #
 # Author P G Jones - 28/05/2013 <p.g.jones@qmul.ac.uk> : First revision
 #################################################################################################### 
-from pyvisa.vpp43 import visa_library, visa_exceptions
-visa_library.load_library("/Library/Frameworks/Visa.framework/VISA") # Mac specific??
-import visa
+try:
+    from pyvisa.vpp43 import visa_library, visa_exceptions
+    visa_library.load_library("/Library/Frameworks/Visa.framework/VISA") # Mac specific??
+    import visa
+except ImportError:
+    print "No VISA/pyVISA software installed, cannot use VisaUSB"
+
 import socket
 
 class VisaUSB(object):

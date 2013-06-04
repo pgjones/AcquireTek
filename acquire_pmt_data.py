@@ -16,7 +16,7 @@ usb_conn = scope_connections.VisaUSB()
 tek_scope = scopes.TektronixMSO2000(usb_conn)
 tek_scope.lock()
 trigger = 0.03 # Volts
-tek_scope.set_trigger(-trigger, 1, True) 
+tek_scope.set_trigger(-trigger, 2, True) 
 integrals_1 = ROOT.TH1D("integrals", "integrals 1", 1000, 0.0, 10.0)
 integrals_2 = ROOT.TH1D("integrals", "integrals 2", 1000, 0.0, 10.0)
 c1 = ROOT.TCanvas()
@@ -49,6 +49,7 @@ while time.time() - t_start < acquire_time:
         keep = (hist_1, hist_2)
     except Exception:
         print "Scope died."
+    print "Time left:", acquire_time - (time.time() - t_start)
     c1.Update()
 
 tek_scope.unlock()
