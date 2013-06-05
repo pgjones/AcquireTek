@@ -17,6 +17,22 @@ def waveform_to_hist(data_forms, data_units, title="hist"):
     histogram.GetYaxis().SetTitle(data_units[1])
     return histogram
 
+def integrate_signal(histogram, trigger=0.0):
+    """ Return the integral of the signal pulse, assumed to be at trigger."""
+    zero_bin = histogram.GetXaxis().FindBin(0.0) # Find the bin for time 0 (trigger)
+    if histogram.GetBinContent(zero_bin) < trigger:
+        raise Exception("No triggered singal??")
+    sig = [zero_bin, zero_bin + 1] # Signal start/end
+    for bin in range(zero_bin, 0, -1): # Find signal start
+        if histogram.GetBinContent(bin) <= 0.0:
+            sig[0] = bin
+            break
+    for bin in range(zero_bin, histogram.GetNbinsX()):
+        if histogram.GetBinContent(bin) <= 0.0:
+            sig[1] = bin
+            break
+    return histogram.Integral(sig[0], sig[1])
+
 class WaveformFile(object):
     """ A root file filled with waveforms."""
     def __init__(self, file_path, channels):

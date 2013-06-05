@@ -1,62 +1,44 @@
 #!/usr/bin/env python
 #
-# acquire_pmt_data.py
+# acquire_pmt_signals.py
 #
-# Acquisition of PMT Data from a Tektronix scope
+# Acquisition of PMT Data from a Tektronix scope with saving of the signal to root file.
 #
-# Author P G Jones - 31/05/2013 <p.g.jones@qmul.ac.uk> : First revision
+# Author P G Jones - 05/06/2013 <p.g.jones@qmul.ac.uk> : First revision
 #################################################################################################### 
 import scope_connections
 import scopes
-import numpy
-import ROOT
+import root_utils
 import time
 
 usb_conn = scope_connections.VisaUSB()
-tek_scope = scopes.TektronixMSO2000(usb_conn)
+tek_scope = scopes.Tektronix2000(usb_conn)
+# First setup the scope, lock the front panel
 tek_scope.lock()
+tek_scope.set_single_acquisition() # Single signal acquisition mode
+tek_scope.set_invert_channel(1, True) # Invert both channels
+tek_scope.set_invert_channel(2, True) # Invert both channels
 trigger = 0.03 # Volts
-tek_scope.set_trigger(-trigger, 2, True) 
-integrals_1 = ROOT.TH1D("integrals", "integrals 1", 1000, 0.0, 10.0)
-integrals_2 = ROOT.TH1D("integrals", "integrals 2", 1000, 0.0, 10.0)
-c1 = ROOT.TCanvas()
-c1.Divide(2, 2)
-keep = None
+tek_scope.set_edge_trigger(trigger, 1)
+tek_scope.set_data_mode(49500, 50500)
+tek_scope.lock() # Re acquires the preamble
+# Now create a root file to save 2 channel data in
+results = root_utils.ValueFile("results.root", 2)
+
 t_start = time.time()
 acquire_time = 30 * 60 # in seconds
 print "Started at", t_start
 while time.time() - t_start < acquire_time:
-    tek_scope.acquire()
-    # Channel 1
+    tek_scope.acquire(True) # Wait for triggered acquisition
     try:
-        wave_time, wave_data = tek_scope.get_waveform(1)
-        hist_1 = ROOT.TH1D("hist", "hist", len(wave_time), wave_time[0], wave_time[-1])
-        for index, a in enumerate(wave_data):
-            hist_1.SetBinContent(index + 1, -a) # Invert spectrum
-        integrals_1.Fill(hist_1.Integral(hist_1.FindFirstBinAbove(trigger), hist_1.FindLastBinAbove(trigger)))
+        # Channel 1
+        hist_1 = root_utils.waveform_to_hist(tek_scope.get_waveform(1), tek_scope.get_waveform_units(1))
+        results.set_data(root_utils.integrate_signal(hist_1, trigger), 1)
         # Channel 2
-        wave_time, wave_data = tek_scope.get_waveform(2)
-        hist_2 = ROOT.TH1D("hist", "hist", len(wave_time), wave_time[0], wave_time[-1])
-        for index, a in enumerate(wave_data):
-            hist_2.SetBinContent(index + 1, -a) # Invert spectrum
-        integrals_1.Fill(hist_2.Integral(hist_2.FindFirstBinAbove(trigger), hist_2.FindLastBinAbove(trigger)))
-        
-        c1.cd(1)
-        hist_1.Draw()
-        c1.cd(2)
-        hist_2.Draw()
-        c1.cd()
-        keep = (hist_1, hist_2)
+        hist_2 = root_utils.waveform_to_hist(tek_scope.get_waveform(2), tek_scope.get_waveform_units(2))
+        results.set_data(root_utils.integrate_signal(hist_2, trigger), 2)
+        results.save()
     except Exception:
-        print "Scope died."
-    print "Time left:", acquire_time - (time.time() - t_start)
-    c1.Update()
-
+        print "Scope died, acquisition lost."
+    print "Time left:", acquire_time - (time.time() - t_start), "s"
 tek_scope.unlock()
-c1.cd(3)
-integrals_1.Draw()
-c1.cd(4)
-integrals_2.Draw()
-c1.cd()
-c1.Update()
-raw_input("Wait")
