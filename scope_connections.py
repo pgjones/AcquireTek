@@ -19,11 +19,14 @@ class VisaUSB(object):
     """ Connect via visa/usb."""
     def __init__(self):
         """ Try the default connection."""
-        for instrument in visa.get_instruments_list():
-            if instrument[0:3] == "USB":
-                self._connection = visa.instrument(instrument)
-                print "Connecting to", instrument
-                print "Which has identity:", self.ask("*idn?") # Ask the scope for its identity
+        try:
+            for instrument in visa.get_instruments_list():
+                if instrument[0:3] == "USB":
+                    self._connection = visa.instrument(instrument)
+                    print "Connecting to", instrument
+                    print "Which has identity:", self.ask("*idn?") # Ask the scope for its identity
+        except visa_exceptions.VisaIOError:
+            print "Cannot connect to any instrument."
     def send(self, command):
         """ Send a command, doesn't expect a returned result."""
         self._connection.write(command)

@@ -7,14 +7,19 @@
 # Author P G Jones - 04/06/2013 <p.g.jones@qmul.ac.uk> : First revision
 #################################################################################################### 
 import ROOT
+import array
+c1 = ROOT.TCanvas()
 
 def waveform_to_hist(data_forms, data_units, title="hist"):
     """ Pass a tuple of dataforms and data units."""
     histogram = ROOT.TH1D("data", title, len(data_forms[0]), data_forms[0][0], data_forms[0][-1])
+    histogram.SetDirectory(0)
     for index, data in enumerate(data_forms[1]):
         histogram.SetBinContent(index + 1, data)
     histogram.GetXaxis().SetTitle(data_units[0])
     histogram.GetYaxis().SetTitle(data_units[1])
+    histogram.Draw()
+    c1.Update()
     return histogram
 
 def integrate_signal(histogram, trigger=0.0):
@@ -40,10 +45,10 @@ class WaveformFile(object):
         self._file = ROOT.TFile(file_path, "RECREATE")
         self._tree = ROOT.TTree("T", "Data tree")
         self._hists = {}
-        for channel in range(0, channels):
+        for channel in range(1, channels + 1):
             self._hists[channel] = ROOT.TH1D()
             self._tree.Branch("channel_%i" % channel, "TH1D", self._hists[channel])
-    def __del__(self):
+    def close(self):
         """ Close the file."""
         self._tree.Write()
         self._file.Close()
@@ -62,10 +67,10 @@ class ValueFile(object):
         self._file = ROOT.TFile(file_path, "RECREATE")
         self._tree = ROOT.TTree("T", "Data tree")
         self._values = {}
-        for channel in range(0, channels):
-            self._values[channel] = array('f', [0])
-            self._tree.Branch("channel_%i" % channel, self._values[channe], "value/F")
-    def __del__(self):
+        for channel in range(1, channels + 1):
+            self._values[channel] = array.array('f', [0])
+            self._tree.Branch("channel_%i" % channel, self._values[channel], "value/F")
+    def close(self):
         """ Close the file."""
         self._tree.Write()
         self._file.Close()

@@ -18,15 +18,15 @@ tek_scope.lock()
 tek_scope.set_single_acquisition() # Single signal acquisition mode
 tek_scope.set_invert_channel(1, True) # Invert both channels
 tek_scope.set_invert_channel(2, True) # Invert both channels
-trigger = 0.03 # Volts
+trigger = -2e3 # Volts
 tek_scope.set_edge_trigger(trigger, 1)
-tek_scope.set_data_mode(49500, 50500)
+tek_scope.set_data_mode(1, 100000)#49500, 50500)
 tek_scope.lock() # Re acquires the preamble
 # Now create a root file to save 2 channel data in
 results = root_utils.ValueFile("results.root", 2)
 
 t_start = time.time()
-acquire_time = 30 * 60 # in seconds
+acquire_time = 2 * 60 # in seconds
 print "Started at", t_start
 while time.time() - t_start < acquire_time:
     tek_scope.acquire(True) # Wait for triggered acquisition
@@ -38,7 +38,9 @@ while time.time() - t_start < acquire_time:
         hist_2 = root_utils.waveform_to_hist(tek_scope.get_waveform(2), tek_scope.get_waveform_units(2))
         results.set_data(root_utils.integrate_signal(hist_2, trigger), 2)
         results.save()
-    except Exception:
+    except Exception, e:
         print "Scope died, acquisition lost."
+        print e
     print "Time left:", acquire_time - (time.time() - t_start), "s"
 tek_scope.unlock()
+results.close()

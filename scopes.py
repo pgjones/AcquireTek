@@ -37,6 +37,7 @@ class Tektronix(object):
         self._connection.send("*opc?") # Will wait until scope is ready
         self._connection.send("verbose 1") # If the headers are on ensure they are verbose
         self._locked = False # Local locking of scope settings
+        self._data_start = 1
     def __del__(self):
         """ Free up the scope."""
         self._connection.send("lock none") # Unlock the front panel
@@ -110,6 +111,7 @@ class Tektronix(object):
         self._connection.send("wfmpre:pt_fmt y") # Single point format
         self._connection.send("data:encdg ribinary") # Signed int binary mode
         self._connection.send("data:start %i" % data_start) # Start point
+        self._data_start = data_start
         self._connection.send("data:stop %i" % data_stop) # 100000 is full 
     def acquire(self, triggered=True):
         """ Wait until scope has an acquisition and optionally has triggered."""
@@ -151,8 +153,8 @@ class Tektronix(object):
         preamble = {}
         for preamble_setting in self._connection.ask("wfmpre?").strip()[8:].split(';'): # Ask for waveform information
             key, value = preamble_setting.split(' ',1)
-            if key in preamble.keys():
-                preamble[key] = preamble_fields[key](value) # Conver the value to the correct field type 
+            if key in Tektronix._preamble_fields.keys():
+                preamble[key] = Tektronix._preamble_fields[key](value) # Conver the value to the correct field type 
             else:
                 print "Preamble key", key, "is ignored."
         self._preamble[channel] = preamble
@@ -171,7 +173,7 @@ class Tektronix(object):
         data_type += str(self._preamble[channel]['BYT_NR']) # Number of bits per data point
         return data_type
                         
-class Tektronix2000(object):
+class Tektronix2000(Tektronix):
     """ Specific commands for the DPO/MSO 2000 series scopes."""
     # Update the preamble fields with those specific to this scope model                    
     Tektronix._preamble_fields.update( { 'WFID'   : str, # Description of the data
@@ -184,9 +186,9 @@ class Tektronix2000(object):
                                          'FILTERFREQ' : int } )
     def __init__(self, connection):
         """ Intialise the scope with a connection."""
-        super(Tektronix3000, self).__init__(connection)
+        super(Tektronix2000, self).__init__(connection)
 
-class Tektronix3000(object):
+class Tektronix3000(Tektronix):
     """ Specific commands for the DPO/MSO 2000 series scopes."""
     # Update the preamble fields with those specific to this scope model                    
     Tektronix._preamble_fields.update( { 'CENTERFREQUENCY' : float,
