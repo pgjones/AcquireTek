@@ -27,6 +27,7 @@ class VisaUSB(object):
                     print "Which has identity:", self.ask("*idn?") # Ask the scope for its identity
         except visa_exceptions.VisaIOError:
             print "Cannot connect to any instrument."
+            raise
     def send(self, command):
         """ Send a command, doesn't expect a returned result."""
         self._connection.write(command)

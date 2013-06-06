@@ -104,8 +104,8 @@ class Tektronix(object):
         else:
             self._connection.send("trigger:a:edge:slope rise") # ... rising slope
         self._connection.send("trigger:a:level %f" % trigger_level) # Sets the trigger level in Volts
-        self._connection.send("trigger:a:level:ch1 %f" % trigger_level) # Sets the trigger level in Volts
-        self._connection.ask("*opc?") # Wait unti scope is ready
+        self._connection.send("trigger:a:level:ch%i %f" % (channel, trigger_level)) # Sets the trigger level in Volts
+        self._connection.ask("*opc?") # Wait until scope is ready
     def set_data_mode(self, data_start=1, data_stop=100000):
         """ Set the settings for the data returned by the scope."""
         self._connection.send("wfmpre:pt_fmt y") # Single point format
@@ -118,7 +118,7 @@ class Tektronix(object):
         self._connection.send("acquire:state run") # Equivalent to on
         # Wait until acquiring and there is a trigger
         while int(self._connection.ask("acquire:state?")) == 0 or (triggered and self._connection.ask("trigger:state?") == "READY"): 
-            print int(self._connection.ask("acquire:state?")), self._connection.ask("trigger:state?")
+            pass
     def get_waveform(self, channel):
         """ Acquire a waveform from channel=channel."""
         if self._locked == False or self._channels[channel] == False:
@@ -126,6 +126,7 @@ class Tektronix(object):
         self._connection.send("data:source ch%i" % channel) # Set the data source to the channel
         data = self._connection.ask("curve?") # Ask for the data
         if data is None:
+            self._connection.ask("*opc?") # Wait until scope is ready
             raise Exception("Scope has errored.")
         header_len = 2 + int(data[1])
         waveform = numpy.fromstring(data[header_len:], self._get_data_type(channel))
