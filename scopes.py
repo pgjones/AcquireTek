@@ -132,10 +132,13 @@ class Tektronix(object):
         waveform = numpy.fromstring(data[header_len:], self._get_data_type(channel))
         # Now convert the waveform into voltage units
         waveform = self._preamble[channel]['YZERO'] + (waveform - self._preamble[channel]['YOFF']) * self._preamble[channel]['YMULT']
+        return waveform
+    def get_timeform(self, channel):
+        """ Return the timebase for the waveform."""
         # Now build the relevant timing array correcting for data portion acquired
         timeform = self._preamble[channel]['XZERO'] + self._data_start * self._preamble[channel]['XINCR'] + \
             (numpy.arange(self._preamble[channel]['NR_PT']) - self._preamble[channel]['PT_OFF']) * self._preamble[channel]['XINCR']
-        return (timeform, waveform)
+        return timeform
 #### Internal ###################################################################################### 
     def _find_active_channels(self):
         """ Finds out how many channels are active."""
