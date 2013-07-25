@@ -117,8 +117,14 @@ class Tektronix(object):
         """ Wait until scope has an acquisition and optionally has triggered."""
         self._connection.send("acquire:state run") # Equivalent to on
         # Wait until acquiring and there is a trigger
-        while int(self._connection.ask("acquire:state?")) == 0 or (triggered and self._connection.ask("trigger:state?") == "READY"): 
-            pass
+        while True:
+            acquisition_state = self._connection.ask("acquire:state?")
+            if acquisition_state is not None and int(acquisition_state) != 0: # acquired a trigger
+                if triggered and self._connection.ask("trigger:state?") != "READY": # Triggered as well 
+                    break
+                elif not triggered:
+                    break
+                # Otherwise carry on
     def get_waveform(self, channel):
         """ Acquire a waveform from channel=channel."""
         if self._locked == False or self._channels[channel] == False:

@@ -19,8 +19,8 @@ tek_scope.lock()
 tek_scope.set_single_acquisition() # Single signal acquisition mode
 tek_scope.set_invert_channel(1, True) # Invert both channels
 tek_scope.set_invert_channel(2, True) # Invert both channels
-trigger = -0.010 # Volts
-tek_scope.set_edge_trigger(trigger, 2, True) # Falling edge trigger
+trigger = -0.020 # Volts
+tek_scope.set_edge_trigger(trigger, 1, True) # Falling edge trigger
 tek_scope.set_data_mode(49500, 50500)
 tek_scope.lock() # Re acquires the preamble
 # Now create a root file to save 2 channel data in
