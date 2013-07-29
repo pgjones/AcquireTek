@@ -38,8 +38,6 @@ class VisaUSB(object):
         except visa_exceptions.VisaIOError:
             # No answer given
             return None
-        except pyvisa.visa_exceptions.VisaIOError:
-            return None
 
 class TCPIP(object):
     """ Connect via TCP/IP i.e. ethernet."""
