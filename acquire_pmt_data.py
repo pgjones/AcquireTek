@@ -22,6 +22,8 @@ tek_scope.set_invert_channel(2, True) # Invert both channels
 trigger = -0.020 # Volts
 trigger_channel = 1
 tek_scope.set_edge_trigger(trigger, trigger_channel, True) # Falling edge trigger
+tek_scope.set_channel_coupling(1, "ac")
+tek_scope.set_channel_coupling(2, "ac")
 tek_scope.set_data_mode(49500, 50500)
 tek_scope.lock() # Re acquires the preamble
 # Now create a root file to save 2 channel data in
