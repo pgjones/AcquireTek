@@ -20,11 +20,14 @@ tek_scope.set_single_acquisition() # Single signal acquisition mode
 tek_scope.set_invert_channel(1, True) # Invert both channels
 tek_scope.set_invert_channel(2, True) # Invert both channels
 trigger = -0.020 # Volts
-tek_scope.set_edge_trigger(trigger, 1, True) # Falling edge trigger
+trigger_channel = 1
+tek_scope.set_edge_trigger(trigger, trigger_channel, True) # Falling edge trigger
 tek_scope.set_data_mode(49500, 50500)
 tek_scope.lock() # Re acquires the preamble
 # Now create a root file to save 2 channel data in
 results = utils.HDF5File("results", 2)
+results.set_meta_data("trigger", trigger)
+results.set_meta_data("trigger_channel", trigger_channel)
 results.set_meta_data("timeform_1", tek_scope.get_timeform(1))
 results.set_meta_data("timeform_2", tek_scope.get_timeform(2))
 #results.set_meta_dict(tek_scope.get_preamble())
