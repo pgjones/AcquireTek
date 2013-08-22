@@ -84,6 +84,8 @@ class Tektronix(object):
         else:
             self._connection.send("ch%i:invert off" % channel)
         self._connection.ask("*opc?") # Wait unti scope is ready
+    def set_channel_coupling(self, channel, coupling="ac"):
+        self._connection.send("ch%i:coupling %s" % (channel, coupling))
     def set_single_acquisition(self):
         """ Set the scope in single acquisition mode."""
         self._connection.send("acquire:mode sample") # Single acquisition mode, not average
