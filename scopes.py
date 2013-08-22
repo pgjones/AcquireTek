@@ -86,6 +86,8 @@ class Tektronix(object):
         self._connection.ask("*opc?") # Wait unti scope is ready
     def set_channel_coupling(self, channel, coupling="ac"):
         self._connection.send("ch%i:coupling %s" % (channel, coupling))
+    def set_channel_y(self, channel, ymult):
+        self._connection.send("ch%i:volts %f" %(channel, ymult))
     def set_single_acquisition(self):
         """ Set the scope in single acquisition mode."""
         self._connection.send("acquire:mode sample") # Single acquisition mode, not average
