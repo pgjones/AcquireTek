@@ -15,6 +15,7 @@ class File(object):
     def __init__(self, file_path, channels, extension):
         """ Intialise the data structure."""
         self._file_path = file_path
+        print "Using file", file_path + extension
         self._extension = extension
         self._data = {} # Dict by channel or list of waveforms
         for channel in range(1, channels + 1):
@@ -45,6 +46,8 @@ class File(object):
         self._save(self._file_path + self._extension)
         if os.path.isfile(self._file_path + "_bk" + self._extension):
             os.remove(self._file_path + "_bk" + self._extension)
+    def load(self):
+        self._load(self._file_path + self._extension)
 #--- To Override -----------------------------------------------------------------------------------
     def close(self):
         """ Close/finish."""
@@ -52,7 +55,7 @@ class File(object):
     def _save(self, file_path):
         """ Save the data to a file."""
         pass
-    def load(self):
+    def _load(self, file_path):
         """ Load the data from a file."""
 
 #### Pickle ######################################################################################## 
@@ -69,9 +72,9 @@ class PickleFile(File):
                       "data" : self._data }
         with open(file_path, "wb") as file_:
             pickle.dump(full_data, file_)
-    def load(self):
+    def _load(self, file_path):
         """ Load the data from a pickle file."""
-        with open(self._file_path, "rb") as file_:
+        with open(file_path, "rb") as file_:
             full_data = pickle.load(file_)
         self._meta_data = full_data["meta"]
         self._data = full_data["data"]
@@ -96,9 +99,9 @@ class HDF5File(File):
                 data = self._data[channel]
                 for index, waveform in enumerate(data):
                     file_.create_dataset("ch%i_%i" % (channel, index), data=waveform)                
-    def load(self):
+    def _load(self, file_path):
         """ Load the data from a hdf5 file."""
-        with h5py.File(self._file_path, "r") as file_:
+        with h5py.File(file_path, "r") as file_:
             for key in file_.attrs:
                 self._meta_data[key] = file_.attrs[key]
             for dataset in file_:

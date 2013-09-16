@@ -48,6 +48,7 @@ def averaged_acquisition_example(name, n_events, averages):
             time.wait(1)
         if time.time()-last_save_time > 60: # seconds
             results.auto_save()
+            last_save_time = time.time()
     results.save()
     print "Finished at", time.strftime("%Y-%m-%d %H:%M:%S")
 

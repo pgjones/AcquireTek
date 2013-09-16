@@ -29,7 +29,6 @@ def single_acquisition_example(name, n_events, trigger, trigger_channel):
     # Now create a HDF5 file and save the meta information
     file_name = name + "_" + str(datetime.date.today())
     results = utils.HDF5File(file_name, 2)
-    print "AAE", tek_scope.get_preamble(1)
     results.add_meta_data("trigger", trigger)
     results.add_meta_data("trigger_channel", trigger_channel)
     results.add_meta_data("ch1_timeform", tek_scope.get_timeform(1))
@@ -52,6 +51,7 @@ def single_acquisition_example(name, n_events, trigger, trigger_channel):
             time.wait(1)
         if time.time()-last_save_time > 60: # seconds
             results.auto_save()
+            last_save_time = time.time()
     results.save()
     print "Finished at", time.strftime("%Y-%m-%d %H:%M:%S")
 
