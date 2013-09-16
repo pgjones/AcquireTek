@@ -7,21 +7,24 @@
 # Author P G Jones - 06/06/2013 <p.g.jones@qmul.ac.uk> : First revision
 #################################################################################################### 
 import re
+import os
+import shutil
 
 class File(object):
     """ Generic file, no saving."""
-    def __init__(self, file_path, channels):
+    def __init__(self, file_path, channels, extension):
         """ Intialise the data structure."""
         self._file_path = file_path
+        self._extension = extension
         self._data = {} # Dict by channel or list of waveforms
         for channel in range(1, channels + 1):
             self._data[channel] = []
         self._meta_data = {} # Meta data dict
-    def set_meta_dict(self, dict):
+    def add_meta_dict(self, dict, prefix=""):
         """ Set the meta data for a whole dict."""
         for key in dict.keys():
-            self._meta_data[key] = dict[key]
-    def set_meta_data(self, key, data):
+            self._meta_data[prefix + key] = dict[key]
+    def add_meta_data(self, key, data):
         """ Set the meta data for key."""
         self._meta_data[key] = data
     def add_data(self, data, channel):
@@ -33,11 +36,20 @@ class File(object):
     def get_data(self, channel):
         """ Get the data for channel."""
         return self._data[channel]
+    def autosave(self):
+        """ Save the data into a backup."""
+        if os.path.isfile(self._file_path + self._extension):
+            shutil.copyfile(self._file_path + self._extension, self._file_path + "_bk" + self._extension)
+        self._save(self._file_path + self._extension)
+    def save(self):
+        self._save(self._file_path + self._extension)
+        if os.path.isfile(self._file_path + "_bk" + self._extension):
+            os.remove(self._file_path + "_bk" + self._extension)
 #--- To Override -----------------------------------------------------------------------------------
     def close(self):
         """ Close/finish."""
         pass
-    def save(self):
+    def _save(self, file_path):
         """ Save the data to a file."""
         pass
     def load(self):
@@ -50,13 +62,12 @@ class PickleFile(File):
     """ A pickle file."""
     def __init__(self, file_path, channels):
         """ Initialise a pickle file."""
-        super(PickleFile, self).__init__(file_path, channels)
-        self._file_path += ".pkl"
-    def save(self):
+        super(PickleFile, self).__init__(file_path, channels, ".pkl")
+    def _save(self, file_path):
         """ Save of the data to a pickle file."""
         full_data = { "meta" : self._meta_data,
                       "data" : self._data }
-        with open(self._file_path, "wb") as file_:
+        with open(file_path, "wb") as file_:
             pickle.dump(full_data, file_)
     def load(self):
         """ Load the data from a pickle file."""
@@ -75,11 +86,10 @@ class HDF5File(File):
     """ A hdf5 file."""
     def __init__(self, file_path, channels):
         """ Initialise a hdf5 file."""
-        super(HDF5File, self).__init__(file_path, channels)
-        self._file_path += ".hdf5"
-    def save(self):
+        super(HDF5File, self).__init__(file_path, channels, ".hdf5")
+    def _save(self, file_path):
         """ Save of the data to a hdf5 file."""
-        with h5py.File(self._file_path, "w") as file_:
+        with h5py.File(file_path, "w") as file_:
             for key in self._meta_data.keys():
                 file_.attrs[key] = self._meta_data[key]
             for channel in self._data.keys():
@@ -107,10 +117,10 @@ class RootFile(File):
     """ A root file."""
     def __init__(self, file_path, channels):
         """ Initialise a root file."""
-        super(ROOTFile, self).__init__(file_path, channels)
-    def save(self):
+        super(ROOTFile, self).__init__(file_path, channels, ".root")
+    def save(self, file_path):
         """ Save of the data to a root file."""
-        self._file = ROOT.TFile(self._file_path, "RECREATE")
+        self._file = ROOT.TFile(file_path, "RECREATE")
         self._tree = ROOT.TTree("T", "Data tree")
         self._branch_hists = {}
         for channel in self._data.keys:

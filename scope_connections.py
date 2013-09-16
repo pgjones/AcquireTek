@@ -15,16 +15,39 @@ except ImportError:
 
 import socket
 
-class VisaUSB(object):
+class TekConnection(object):
+    """ Base class for Tektronix scope connections."""
+    def __init__(self):
+        print "\n-----------------------------------------------------------------------------------"
+    def __del__(self):
+        print "-----------------------------------------------------------------------------------\n"
+    def sync(self):
+        """ Send the *OPC command, and wait until scope is ready for more data."""
+        self.send("*opc?")
+    def identity(self):
+        """ Return the identity and connection method."""
+        return self.ask("*idn?")
+    def send_sync(self, command):
+        """ Send a command and wait till the scope is ready."""
+        self.send(command)
+        self.sync()
+    def send(self, command):
+        pass
+    def ask(self, command):
+        pass
+
+
+class VisaUSB(TekConnection):
     """ Connect via visa/usb."""
     def __init__(self):
         """ Try the default connection."""
+        super(VisaUSB, self).__init__()
         try:
             for instrument in visa.get_instruments_list():
                 if instrument[0:3] == "USB":
                     self._connection = visa.instrument(instrument)
                     print "Connecting to", instrument
-                    print "Which has identity:", self.ask("*idn?") # Ask the scope for its identity
+                    print "Scope identity:", self.identity()
         except visa_exceptions.VisaIOError:
             print "Cannot connect to any instrument."
             raise
@@ -39,15 +62,16 @@ class VisaUSB(object):
             # No answer given
             return None
 
-class TCPIP(object):
+class TCPIP(TekConnection):
     """ Connect via TCP/IP i.e. ethernet."""
     def __init__(self, ip, port):
         """ Connect with the ip and port address."""
+        super(VisaUSB, self).__init__()
         self._connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._connection.connect((ip, port))
         self._connection.setblocking(False)
         print "Connecting to %s:%i" % (ip, port)
-        print "Which had identity:", self.ask("*idn?")
+        print "Scope identity:", self.identity()
     def __del__(self):
         """ Close the connection."""
         self._connection.close()
@@ -69,3 +93,4 @@ class TCPIP(object):
             if char:
                 response += char
         return response.rstrip()
+    

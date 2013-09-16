@@ -32,15 +32,16 @@ class Tektronix(object):
         self._preamble = {}
         self._channels = {} 
         self._connection = connection
-        self._connection.send("lock none") # Unlock the front panel
-        self._connection.send("*cls") # Clear the scope
-        self._connection.send("*opc?") # Will wait until scope is ready
-        self._connection.send("verbose 1") # If the headers are on ensure they are verbose
+        self._connection.send_sync("lock none") # Unlock the front panel
+        self._connection.send_sync("*cls") # Clear the scope
+        self._connection.send_sync("autoset") # Reset the scope
+        self._connection.send_sync("verbose 1") # If the headers are on ensure they are verbose
         self._locked = False # Local locking of scope settings
         self._data_start = 1
+        self._triggered = False
     def __del__(self):
         """ Free up the scope."""
-        self._connection.send("lock none") # Unlock the front panel
+        self._connection.send_sync("lock none") # Unlock the front panel
 #################################################################################################### 
     def interactive(self):
         """ Control the scope interactively."""
@@ -65,68 +66,79 @@ class Tektronix(object):
         return (self._preamble[channel]['XUNIT'], self._preamble[channel]['YUNIT'])
     def lock(self):
         """ Get the current settings and allow no more changes."""
-        self._connection.send("lock all") # Prevent people channing the settings via the front panel
-        self._connection.send("header off") # Turn all headers off
+        self._connection.send_sync("lock all") # Prevent people channing the settings via the front panel
+        self._connection.send_sync("header off") # Turn all headers off
         self._find_active_channels()
         for channel in self._channels.keys():
             if self._channels[channel]:
                 self._get_preamble(channel)
         self._locked = True
-        self._connection.ask("*opc?") # Wait unti scope is ready
     def unlock(self):
         """ Unlock and allow changes."""
         self._locked = False
-        self._connection.send("lock none") # Allow the front panel to be used
+        self._connection.send_sync("lock none") # Allow the front panel to be used
+    def get_preamble(self, channel):
+        return self._preamble[channel]
+#### Channel Settings ###############################################################################
+    def set_active_channel(self, channel, active=True):
+        if active:
+            self._connection.send_sync("select:ch%i on" % channel)
+        else:
+            self._connection.send_sync("select:ch%i off" % channel)
     def set_invert_channel(self, channel, invert=True):
         """ Invert the channel."""
         if invert:
-            self._connection.send("ch%i:invert on" % channel)
+            self._connection.send_sync("ch%i:invert on" % channel)
         else:
-            self._connection.send("ch%i:invert off" % channel)
-        self._connection.ask("*opc?") # Wait unti scope is ready
+            self._connection.send_sync("ch%i:invert off" % channel)
     def set_channel_coupling(self, channel, coupling="ac"):
-        self._connection.send("ch%i:coupling %s" % (channel, coupling))
+        self._connection.send_sync("ch%i:coupling %s" % (channel, coupling))
     def set_channel_y(self, channel, ymult):
-        self._connection.send("ch%i:volts %f" %(channel, ymult))
+        self._connection.send_sync("ch%i:volts %f" %(channel, ymult))
+#### Acquisition Type ###############################################################################
     def set_single_acquisition(self):
         """ Set the scope in single acquisition mode."""
-        self._connection.send("acquire:mode sample") # Single acquisition mode, not average
-        self._connection.ask("*opc?") # Wait unti scope is ready
+        self._connection.send_sync("acquire:mode sample") # Single acquisition mode, not average
     def set_average_acquisition(self, averages):
         """ Set the scope in average acquisition mode."""
-        self._connection.send("acquire:mode average")
-        self._connection.send("acquire::numavg %i" % averages)
-        self._connection.ask("*opc?") # Wait unti scope is ready
+        self._connection.send_sync("acquire:mode average")
+        self._connection.send_sync("acquire::numavg %i" % averages)
+#### Trigger Settings ###############################################################################
+    def set_untriggered(self):
+        """ Set the scope to untriggered mode."""
+        self._triggered = False
+        self._connection.send_sync("trigger:a:mode auto")
     def set_edge_trigger(self, trigger_level, channel, falling=False):
-        """ Set the trigger settings."""
-        self._connection.send("trigger:a:type edge") # Chose the edge trigger
-        self._connection.send("trigger:a:mode normal") # Normal mode (waits for a trigger)
-        self._connection.send("trigger:a:edge:source ch%i" % channel)
-        self._connection.send("trigger:a:edge:coupling dc") # DC coupling
+        """ Set an edge trigger with the settings."""
+        self._triggered = True
+        self._connection.send_sync("trigger:a:type edge") # Chose the edge trigger
+        self._connection.send_sync("trigger:a:mode normal") # Normal mode (waits for a trigger)
+        self._connection.send_sync("trigger:a:edge:source ch%i" % channel)
+        self._connection.send_sync("trigger:a:edge:coupling dc") # DC coupling
         if falling:
-            self._connection.send("trigger:a:edge:slope fall") # Falling or ...
+            self._connection.send_sync("trigger:a:edge:slope fall") # Falling or ...
         else:
-            self._connection.send("trigger:a:edge:slope rise") # ... rising slope
-        self._connection.send("trigger:a:level %f" % trigger_level) # Sets the trigger level in Volts
-        self._connection.send("trigger:a:level:ch%i %f" % (channel, trigger_level)) # Sets the trigger level in Volts
-        self._connection.ask("*opc?") # Wait until scope is ready
+            self._connection.send_sync("trigger:a:edge:slope rise") # ... rising slope
+        self._connection.send_sync("trigger:a:level %f" % trigger_level) # Sets the trigger level in Volts
+        self._connection.send_sync("trigger:a:level:ch%i %f" % (channel, trigger_level)) # Sets the trigger level in Volts
     def set_data_mode(self, data_start=1, data_stop=100000):
         """ Set the settings for the data returned by the scope."""
-        self._connection.send("wfmpre:pt_fmt y") # Single point format
-        self._connection.send("data:encdg ribinary") # Signed int binary mode
-        self._connection.send("data:start %i" % data_start) # Start point
+        self._connection.send_sync("wfmpre:pt_fmt y") # Single point format
+        self._connection.send_sync("data:encdg ribinary") # Signed int binary mode
+        self._connection.send_sync("data:start %i" % data_start) # Start point
         self._data_start = data_start
-        self._connection.send("data:stop %i" % data_stop) # 100000 is full 
-    def acquire(self, triggered=True):
-        """ Wait until scope has an acquisition and optionally has triggered."""
+        self._connection.send_sync("data:stop %i" % data_stop) # 100000 is full 
+#### Data acquistion ################################################################################
+    def acquire(self):
+        """ Wait until scope has an acquisition."""
         self._connection.send("acquire:state run") # Equivalent to on
         # Wait until acquiring and there is a trigger
         while True:
             acquisition_state = self._connection.ask("acquire:state?")
             if acquisition_state is not None and int(acquisition_state) != 0: # acquired a trigger
-                if triggered and self._connection.ask("trigger:state?") != "READY": # Triggered as well 
+                if self._triggered and self._connection.ask("trigger:state?") != "READY": # Triggered as well 
                     break
-                elif not triggered:
+                elif not self._triggered:
                     break
                 # Otherwise carry on
     def get_waveform(self, channel):
@@ -162,8 +174,8 @@ class Tektronix(object):
         self._connection.send("header off")
     def _get_preamble(self, channel):
         """ Retrieve the preamble from the scope."""
-        self._connection.send("header on") # Turn headers on
-        self._connection.send("data:source ch%i" % channel) # Set the source
+        self._connection.send_sync("header on") # Turn headers on
+        self._connection.send_sync("data:source ch%i" % channel) # Set the source
         preamble = {}
         for preamble_setting in self._connection.ask("wfmpre?").strip()[8:].split(';'): # Ask for waveform information
             key, value = preamble_setting.split(' ',1)
@@ -172,7 +184,7 @@ class Tektronix(object):
             else:
                 print "Preamble key", key, "is ignored."
         self._preamble[channel] = preamble
-        self._connection.send("header off") # Turn the headers offf
+        self._connection.send_sync("header off") # Turn the headers offf
     def _get_data_type(self, channel):
         """ Return the data type for the given channel."""
         data_type = ""
