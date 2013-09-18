@@ -32,16 +32,16 @@ class Tektronix(object):
         self._preamble = {}
         self._channels = {} 
         self._connection = connection
+        self._connection.send_sync("*rst") # Reset the scope
         self._connection.send_sync("lock none") # Unlock the front panel
         self._connection.send_sync("*cls") # Clear the scope
-        self._connection.send_sync("autoset") # Reset the scope
         self._connection.send_sync("verbose 1") # If the headers are on ensure they are verbose
         self._locked = False # Local locking of scope settings
         self._data_start = 1
         self._triggered = False
     def __del__(self):
         """ Free up the scope."""
-        self._connection.send_sync("lock none") # Unlock the front panel
+        self.unlock()
 #################################################################################################### 
     def interactive(self):
         """ Control the scope interactively."""
@@ -73,12 +73,29 @@ class Tektronix(object):
             if self._channels[channel]:
                 self._get_preamble(channel)
         self._locked = True
+        self._connection.send_sync("message:show 'Taking Data, scope is locked.'")
+        self._connection.send_sync("message:state on")
     def unlock(self):
         """ Unlock and allow changes."""
         self._locked = False
+        self._connection.send_sync("message:state off")
         self._connection.send_sync("lock none") # Allow the front panel to be used
     def get_preamble(self, channel):
         return self._preamble[channel]
+#### General Settings ###############################################################################
+    def set_x(self, scale, pos=0):
+        """ scale in seconds per div and pos in percentage of screen."""
+        self._connection.send_sync("horizontal:scale %f" % scale)
+        self._connection.send_sync("horizontal:position %i" % pos)
+    def set_data_mode(self, data_start=1, data_stop=None):
+        """ Set the settings for the data returned by the scope."""
+        self._connection.send_sync("wfmpre:pt_fmt y") # Single point format
+        self._connection.send_sync("data:encdg ribinary") # Signed int binary mode
+        self._connection.send_sync("data:start %i" % data_start) # Start point
+        self._data_start = data_start
+        if data_stop is None:
+            data_stop = int(self._connection.ask("horizontal:acqlength?"))
+        self._connection.send_sync("data:stop %i" % data_stop) # 100000 is full 
 #### Channel Settings ###############################################################################
     def set_active_channel(self, channel, active=True):
         if active:
@@ -93,8 +110,11 @@ class Tektronix(object):
             self._connection.send_sync("ch%i:invert off" % channel)
     def set_channel_coupling(self, channel, coupling="ac"):
         self._connection.send_sync("ch%i:coupling %s" % (channel, coupling))
-    def set_channel_y(self, channel, ymult):
-        self._connection.send_sync("ch%i:volts %f" %(channel, ymult))
+    def set_channel_y(self, channel, mult, pos=0.0, offset=0.0):
+        """ The channel y settings; mult or volts per div, yoffset (in volts) and position in divs."""
+        self._connection.send_sync("ch%i:volts %f" %(channel, mult))
+        self._connection.send_sync("ch%i:position %f" %(channel, pos))
+        self._connection.send_sync("ch%i:offset %f" %(channel, offset))
 #### Acquisition Type ###############################################################################
     def set_single_acquisition(self):
         """ Set the scope in single acquisition mode."""
@@ -121,13 +141,8 @@ class Tektronix(object):
             self._connection.send_sync("trigger:a:edge:slope rise") # ... rising slope
         self._connection.send_sync("trigger:a:level %f" % trigger_level) # Sets the trigger level in Volts
         self._connection.send_sync("trigger:a:level:ch%i %f" % (channel, trigger_level)) # Sets the trigger level in Volts
-    def set_data_mode(self, data_start=1, data_stop=100000):
-        """ Set the settings for the data returned by the scope."""
-        self._connection.send_sync("wfmpre:pt_fmt y") # Single point format
-        self._connection.send_sync("data:encdg ribinary") # Signed int binary mode
-        self._connection.send_sync("data:start %i" % data_start) # Start point
-        self._data_start = data_start
-        self._connection.send_sync("data:stop %i" % data_stop) # 100000 is full 
+    def get_trigger_frequency(self):
+        return self._connection.ask("trigger:frequency?")
 #### Data acquistion ################################################################################
     def acquire(self):
         """ Wait until scope has an acquisition."""

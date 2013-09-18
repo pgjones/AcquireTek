@@ -6,5 +6,9 @@ Code to acquire data from a tektronix MSO2000 scope.
  - NI VISA (it is free)
  - PyVISA
 
-### acquire_pmt_data.py
-Acquires PMT signals and integrates them, saving the results into a root ttree.
+### Data type
+Data is retrieved in units of divs, to convert to volts & time (y & x) the preamble must be used such that:
+```python
+y_true = (y_data - YZERO) * YMULT
+x_true = (x_data - XZERO) * XMULT
+```

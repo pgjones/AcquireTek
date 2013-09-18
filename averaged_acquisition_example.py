@@ -11,7 +11,6 @@ import optparse
 import scopes
 import scope_connections
 import utils
-import time
 import datetime
 from pyvisa.vpp43 import visa_exceptions
 
@@ -33,8 +32,8 @@ def averaged_acquisition_example(name, n_events, averages):
     results.add_meta_dict(tek_scope.get_preamble(1), "ch1_")
     results.add_meta_dict(tek_scope.get_preamble(2), "ch2_")
 
-    last_save_time = time.time()
-    print "Starting data taking at time", time.strftime("%Y-%m-%d %H:%M:%S")
+    last_save_time = datetime.datetime.now()
+    print "Starting data taking at time", last_save_time.strftime("%Y-%m-%d %H:%M:%S")
     for event in range(0, n_events):
         tek_scope.acquire()
         try:
@@ -46,7 +45,7 @@ def averaged_acquisition_example(name, n_events, averages):
         except visa_exceptions.VisaIOError, e:
             print "Serious death"
             time.wait(1)
-        if time.time()-last_save_time > 60: # seconds
+        if datetime.datetime.now() - last_save_time > datetime.timedelta(seconds=60):
             results.autosave()
             last_save_time = time.time()
     results.save()
