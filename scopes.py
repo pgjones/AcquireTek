@@ -8,6 +8,7 @@
 #################################################################################################### 
 import re
 import numpy
+import time
 
 class Tektronix(object):
     """ Base class for tektronix scopes."""
@@ -25,7 +26,8 @@ class Tektronix(object):
                         'YUNIT'  : str, # Y unit
                         'YMULT'  : float, # Difference between two y point
                         'YOFF'   : float, # Y offset
-                        'YZERO'  : float } # Y zero value
+                        'YZERO'  : float, # Y zero value
+                        'RECORDLENGTH' : int } # Number of data points
     def __init__(self, connection):
         """ Initialise the scope with a connection to the scope."""
         # Initiliase setttings to nothing
@@ -59,20 +61,21 @@ class Tektronix(object):
         if not self._locked:
             self._find_active_channels()
         return self._channels
-    def get_waveform_units(self, channel):
-        """ Return the unit strings for the waveform."""
-        if not self._locked:
-            self._get_preamble(channel)
-        return (self._preamble[channel]['XUNIT'], self._preamble[channel]['YUNIT'])
     def lock(self):
         """ Get the current settings and allow no more changes."""
         self._connection.send_sync("lock all") # Prevent people channing the settings via the front panel
         self._connection.send_sync("header off") # Turn all headers off
+        self._locked = True
+    def begin(self):
+        """ Start taking data."""
+        if self._locked is False:
+            print "Not locked"
+            raise
+        time.sleep(10) # Prudent to wait for the scope to recover from the settings...
         self._find_active_channels()
         for channel in self._channels.keys():
             if self._channels[channel]:
                 self._get_preamble(channel)
-        self._locked = True
         self._connection.send_sync("message:show 'Taking Data, scope is locked.'")
         self._connection.send_sync("message:state on")
     def unlock(self):
@@ -83,13 +86,21 @@ class Tektronix(object):
     def get_preamble(self, channel):
         return self._preamble[channel]
 #### General Settings ###############################################################################
-    def set_x(self, scale, pos=0):
-        """ scale in seconds per div and pos in percentage of screen."""
+    def set_display_x(self, scale, pos=0):
+        """ The scope x display settings, these do not affect the waveform.
+        scale in seconds per div and pos in percentage of screen."""
         self._connection.send_sync("horizontal:scale %f" % scale)
         self._connection.send_sync("horizontal:position %i" % pos)
+    def set_display_y(self, channel, mult, pos=0.0, offset=0.0):
+        """ The channel y display settings, these do not affect the waveform.
+        mult or volts per div, yoffset (in volts) and position in divs."""
+        self._connection.send_sync("ch%i:volts %f" %(channel, mult))
+        self._connection.send_sync("ch%i:position %f" %(channel, pos))
+        self._connection.send_sync("ch%i:offset %f" %(channel, offset))
+#### Waveform Settings ##############################################################################
     def set_data_mode(self, data_start=1, data_stop=None):
         """ Set the settings for the data returned by the scope."""
-        self._connection.send_sync("wfmpre:pt_fmt y") # Single point format
+        self._connection.send_sync("wfmoutpre:pt_fmt y") # Single point format
         self._connection.send_sync("data:encdg ribinary") # Signed int binary mode
         self._connection.send_sync("data:start %i" % data_start) # Start point
         self._data_start = data_start
@@ -97,6 +108,8 @@ class Tektronix(object):
             data_stop = int(self._connection.ask("horizontal:acqlength?"))
         self._connection.send_sync("data:stop %i" % data_stop) # 100000 is full 
 #### Channel Settings ###############################################################################
+    def set_channel_y(self, channel, scale):
+        self._connection.send_sync("ch%i:scale %f" % (channel, scale))
     def set_active_channel(self, channel, active=True):
         if active:
             self._connection.send_sync("select:ch%i on" % channel)
@@ -110,11 +123,6 @@ class Tektronix(object):
             self._connection.send_sync("ch%i:invert off" % channel)
     def set_channel_coupling(self, channel, coupling="ac"):
         self._connection.send_sync("ch%i:coupling %s" % (channel, coupling))
-    def set_channel_y(self, channel, mult, pos=0.0, offset=0.0):
-        """ The channel y settings; mult or volts per div, yoffset (in volts) and position in divs."""
-        self._connection.send_sync("ch%i:volts %f" %(channel, mult))
-        self._connection.send_sync("ch%i:position %f" %(channel, pos))
-        self._connection.send_sync("ch%i:offset %f" %(channel, offset))
 #### Acquisition Type ###############################################################################
     def set_single_acquisition(self):
         """ Set the scope in single acquisition mode."""
@@ -142,7 +150,11 @@ class Tektronix(object):
         self._connection.send_sync("trigger:a:level %f" % trigger_level) # Sets the trigger level in Volts
         self._connection.send_sync("trigger:a:level:ch%i %f" % (channel, trigger_level)) # Sets the trigger level in Volts
     def get_trigger_frequency(self):
-        return self._connection.ask("trigger:frequency?")
+        trigger_frequency = self._connection.ask("trigger:frequency?")
+        if trigger_freqeuncy == 9.9100e+37:
+            return 0.0
+        else:
+            return trigger_frequency
 #### Data acquistion ################################################################################
     def acquire(self):
         """ Wait until scope has an acquisition."""
@@ -189,10 +201,10 @@ class Tektronix(object):
         self._connection.send("header off")
     def _get_preamble(self, channel):
         """ Retrieve the preamble from the scope."""
+        self._connection.send_sync("data:source ch%i" % channel) # Set the data source to the channel
         self._connection.send_sync("header on") # Turn headers on
-        self._connection.send_sync("data:source ch%i" % channel) # Set the source
         preamble = {}
-        for preamble_setting in self._connection.ask("wfmpre?").strip()[8:].split(';'): # Ask for waveform information
+        for preamble_setting in self._connection.ask("wfmoutpre?").strip()[len("wfmoutpre:") + 1:].split(';'): # Ask for waveform information
             key, value = preamble_setting.split(' ',1)
             if key in Tektronix._preamble_fields.keys():
                 preamble[key] = Tektronix._preamble_fields[key](value) # Conver the value to the correct field type 

@@ -23,7 +23,7 @@ class TekConnection(object):
         print "-----------------------------------------------------------------------------------\n"
     def sync(self):
         """ Send the *OPC command, and wait until scope is ready for more data."""
-        self.send("*opc?")
+        self.send("*wai")
     def identity(self):
         """ Return the identity and connection method."""
         return self.ask("*idn?")

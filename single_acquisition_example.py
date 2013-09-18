@@ -32,8 +32,8 @@ def single_acquisition_example(name, n_events, trigger, trigger_channel):
     results.add_meta_data("trigger_channel", trigger_channel)
     results.add_meta_data("ch1_timeform", tek_scope.get_timeform(1))
     results.add_meta_data("ch2_timeform", tek_scope.get_timeform(2))
-    results.add_meta_dict(tek_scope.get_preamble(1), "ch1_")
-    results.add_meta_dict(tek_scope.get_preamble(2), "ch2_")
+    results.add_meta_dict(tek_scope.get_preamble(1), "ch1")
+    results.add_meta_dict(tek_scope.get_preamble(2), "ch2")
 
     last_save_time = datetime.datetime.now()
     print "Starting data taking at time", last_save_time.strftime("%Y-%m-%d %H:%M:%S")
