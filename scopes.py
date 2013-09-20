@@ -150,8 +150,8 @@ class Tektronix(object):
         self._connection.send_sync("trigger:a:level %f" % trigger_level) # Sets the trigger level in Volts
         self._connection.send_sync("trigger:a:level:ch%i %f" % (channel, trigger_level)) # Sets the trigger level in Volts
     def get_trigger_frequency(self):
-        trigger_frequency = self._connection.ask("trigger:frequency?")
-        if trigger_freqeuncy == 9.9100e+37:
+        trigger_frequency = float(self._connection.ask("trigger:frequency?"))
+        if trigger_frequency > 9.0e+37: # NaN - weird value from scope
             return 0.0
         else:
             return trigger_frequency

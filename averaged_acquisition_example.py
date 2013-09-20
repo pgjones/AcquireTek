@@ -12,6 +12,7 @@ import scopes
 import scope_connections
 import utils
 import datetime
+import time
 from pyvisa.vpp43 import visa_exceptions
 
 def averaged_acquisition_example(name, n_events, averages):
@@ -23,7 +24,7 @@ def averaged_acquisition_example(name, n_events, averages):
     tek_scope.set_active_channel(2)
     tek_scope.set_average_acquisition(averages)
     tek_scope.set_data_mode(49500, 50500)
-    tek_scope.lock() # Re acquires the preamble
+    tek_scope.begin()
     # Now create a HDF5 file and save the meta information
     file_name = name + "_" + str(datetime.date.today())
     results = utils.HDF5File(file_name, 2)
@@ -39,12 +40,12 @@ def averaged_acquisition_example(name, n_events, averages):
         try:
             results.add_data(tek_scope.get_waveform(1), 1)
             results.add_data(tek_scope.get_waveform(2), 2)
-        except Exception, e:
-            print "Scope died, acquisition lost."
-            print e
         except visa_exceptions.VisaIOError, e:
-            print "Serious death"
-            time.wait(1)
+            print "Serious death", e
+            time.sleep(10)
+        except Exception, e:
+            print "Scope died, acquisition lost.", e
+            time.sleep(10)
         if datetime.datetime.now() - last_save_time > datetime.timedelta(seconds=60):
             results.autosave()
             last_save_time = time.time()
