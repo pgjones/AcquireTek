@@ -53,13 +53,17 @@ class VisaUSB(TekConnection):
             raise
     def send(self, command):
         """ Send a command, doesn't expect a returned result."""
-        self._connection.write(command)
+        try:
+            self._connection.write(command)
+        except pyvisa.visa_exceptions.VisaIOError:
+            print "VisaUSB::send: Issues."
     def ask(self, command):
         """ Send a command and expect an answer."""
         try:
             return self._connection.ask(command)
         except visa_exceptions.VisaIOError:
             # No answer given
+            print "VisaUSB::ask: Issues."
             return None
 
 class TCPIP(TekConnection):
