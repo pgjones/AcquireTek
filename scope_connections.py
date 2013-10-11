@@ -6,6 +6,9 @@
 #
 # Author P G Jones - 28/05/2013 <p.g.jones@qmul.ac.uk> : First revision
 #################################################################################################### 
+import logging
+logger = logging.getLogger(__name__)
+
 try:
     from pyvisa.vpp43 import visa_library, visa_exceptions
     visa_library.load_library("/Library/Frameworks/Visa.framework/VISA") # Mac specific??
@@ -32,10 +35,17 @@ class TekConnection(object):
         self.send(command)
         self.sync()
     def send(self, command):
-        pass
+        logging.debug("send: %s" % command)
+        self._send(command)
     def ask(self, command):
+        logging.debug("ask: %s" % command)
+        response = self._ask(command)
+        logging.debug("response: %s" % response)
+        return response
+    def _send(self, command):
         pass
-
+    def _ask(self, command):
+        pass
 
 class VisaUSB(TekConnection):
     """ Connect via visa/usb."""
@@ -49,19 +59,22 @@ class VisaUSB(TekConnection):
                     print "Connecting to", instrument
                     print "Scope identity:", self.identity()
         except visa_exceptions.VisaIOError:
+            logging.exception("Cannot connect to any instrument.")
             print "Cannot connect to any instrument."
             raise
-    def send(self, command):
+    def _send(self, command):
         """ Send a command, doesn't expect a returned result."""
         try:
             self._connection.write(command)
-        except pyvisa.visa_exceptions.VisaIOError:
+        except visa_exceptions.VisaIOError:
+            logging.exception("send")
             print "VisaUSB::send: Issues."
-    def ask(self, command):
+    def _ask(self, command):
         """ Send a command and expect an answer."""
         try:
             return self._connection.ask(command)
         except visa_exceptions.VisaIOError:
+            logging.exception("ask")
             # No answer given
             print "VisaUSB::ask: Issues."
             return None
@@ -79,11 +92,11 @@ class TCPIP(TekConnection):
     def __del__(self):
         """ Close the connection."""
         self._connection.close()
-    def send(self, command):
+    def _send(self, command):
         """ Send a command, doesn't expect a returned result."""
         self._connection.send(command)
 
-    def ask(self, command):
+    def _ask(self, command):
         """ Send a command and expect an answer."""
         self._connection.send(command)
         response = ''
