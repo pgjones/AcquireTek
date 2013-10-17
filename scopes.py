@@ -107,6 +107,15 @@ class Tektronix(object):
         if data_stop is None:
             data_stop = int(self._connection.ask("horizontal:acqlength?"))
         self._connection.send_sync("data:stop %i" % data_stop) # 100000 is full 
+#### Cursor Settings ################################################################################
+    def set_cursors(self, low, high):
+        self._connection.send_sync("cursor:function hbars")
+        self._connection.send_sync("cursor:hbars:position1 %f" % low)
+        self._connection.send_sync("cursor:hbars:position2 %f" % high)
+#### Horizontal Settings ############################################################################
+    def set_horizontal_scale(self, scale):
+        self._connection.send_sync("horizontal:scale %f" % scale)
+        print self._connection.ask("horizontal:scale?")
 #### Channel Settings ###############################################################################
     def set_channel_y(self, channel, scale):
         self._connection.send_sync("ch%i:scale %f" % (channel, scale))
@@ -188,6 +197,12 @@ class Tektronix(object):
         timeform = self._preamble[channel]['XZERO'] + self._data_start * self._preamble[channel]['XINCR'] + \
             (numpy.arange(self._preamble[channel]['NR_PT']) - self._preamble[channel]['PT_OFF']) * self._preamble[channel]['XINCR']
         return timeform
+    def get_measurement(self, measurement):
+        """ Return the measurement value."""
+        value = self._connection.ask("measurement:meas%i:value?" % measurement)
+        if value == 2.8740E-06:
+            return None
+        return value
 #### Internal ###################################################################################### 
     def _find_active_channels(self):
         """ Finds out how many channels are active."""
