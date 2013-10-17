@@ -55,7 +55,7 @@ class VisaUSB(TekConnection):
         try:
             for instrument in visa.get_instruments_list():
                 if instrument[0:3] == "USB":
-                    self._connection = visa.instrument(instrument)
+                    self._connection = visa.instrument(instrument, send_end=True)
                     print "Connecting to", instrument
                     print "Scope identity:", self.identity()
         except visa_exceptions.VisaIOError:
