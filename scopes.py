@@ -169,13 +169,13 @@ class Tektronix(object):
             self._connection.send_sync("trigger:a:edge:slope rise") # ... rising slope
         self._connection.send_sync("trigger:a:level %e" % trigger_level) # Sets the trigger level in Volts
         self._connection.send_sync("trigger:a:level:ch%i %e" % (channel, trigger_level)) # Sets the trigger level in Volts
-    def get_trigger_frequency(self):
-        trigger_frequency = float(self._connection.ask("trigger:frequency?"))
-        if trigger_frequency > 9.0e+37: # NaN - weird value from scope
-            return 0.0
-        else:
-            return trigger_frequency
 #### Data acquistion ################################################################################
+    def get_trigger_frequency(self):
+        trigger_frequency = self._connection.ask("trigger:frequency?")
+        if trigger_frequency == "9.0e+37": # NaN - weird value from scope
+            return 0.0
+        elif trigger_frequency is not None:
+            return float(trigger_frequency)
     def acquire(self):
         """ Wait until scope has an acquisition."""
         self._connection.send("acquire:state run") # Equivalent to on
@@ -214,7 +214,8 @@ class Tektronix(object):
         value = self._connection.ask("measurement:immed:value?")
         if value == "2.8740E-06":
             return None
-        return float(value)
+        elif value is not None:
+            return float(value)
 #### Internal ###################################################################################### 
     def _find_active_channels(self):
         """ Finds out how many channels are active."""
