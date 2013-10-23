@@ -53,7 +53,10 @@ class Tektronix(object):
         try:
             while True:
                 command = raw_input("COMMAND: ")
-                print self._connection.ask(command), "\n"
+                if command[-1] == "?":
+                    print self._connection.ask(command), "\n"
+                else:
+                    self._connection.send_sync(command)
         except KeyboardInterrupt:
             print "Exit: Interative mode."
     def get_active_channels(self):
@@ -89,14 +92,14 @@ class Tektronix(object):
     def set_display_x(self, scale, pos=0):
         """ The scope x display settings, these do not affect the waveform.
         scale in seconds per div and pos in percentage of screen."""
-        self._connection.send_sync("horizontal:scale %f" % scale)
+        self._connection.send_sync("horizontal:scale %e" % scale)
         self._connection.send_sync("horizontal:position %i" % pos)
     def set_display_y(self, channel, mult, pos=0.0, offset=0.0):
         """ The channel y display settings, these do not affect the waveform.
         mult or volts per div, yoffset (in volts) and position in divs."""
-        self._connection.send_sync("ch%i:volts %f" %(channel, mult))
-        self._connection.send_sync("ch%i:position %f" %(channel, pos))
-        self._connection.send_sync("ch%i:offset %f" %(channel, offset))
+        self._connection.send_sync("ch%i:volts %e" %(channel, mult))
+        self._connection.send_sync("ch%i:position %e" %(channel, pos))
+        self._connection.send_sync("ch%i:offset %e" %(channel, offset))
 #### Waveform Settings ##############################################################################
     def set_data_mode(self, data_start=1, data_stop=None):
         """ Set the settings for the data returned by the scope."""
@@ -109,16 +112,15 @@ class Tektronix(object):
         self._connection.send_sync("data:stop %i" % data_stop) # 100000 is full 
 #### Cursor Settings ################################################################################
     def set_cursors(self, low, high):
-        self._connection.send_sync("cursor:function hbars")
-        self._connection.send_sync("cursor:hbars:position1 %f" % low)
-        self._connection.send_sync("cursor:hbars:position2 %f" % high)
+        self._connection.send_sync("cursor:function waveform")
+        self._connection.send_sync("cursor:vbars:position1 %e" % low)
+        self._connection.send_sync("cursor:vbars:position2 %e" % high)
 #### Horizontal Settings ############################################################################
     def set_horizontal_scale(self, scale):
-        self._connection.send_sync("horizontal:scale %f" % scale)
-        print self._connection.ask("horizontal:scale?")
+        self._connection.send_sync("horizontal:scale %e" % scale)
 #### Channel Settings ###############################################################################
     def set_channel_y(self, channel, scale):
-        self._connection.send_sync("ch%i:scale %f" % (channel, scale))
+        self._connection.send_sync("ch%i:scale %e" % (channel, scale))
     def set_active_channel(self, channel, active=True):
         if active:
             self._connection.send_sync("select:ch%i on" % channel)
@@ -140,6 +142,15 @@ class Tektronix(object):
         """ Set the scope in average acquisition mode."""
         self._connection.send_sync("acquire:mode average")
         self._connection.send_sync("acquire::numavg %i" % averages)
+#### Measurement Type ###############################################################################
+    def set_measurement(self, type):
+        """ Set the scope to do a measurement of the waveform."""
+        if not type in ["area"]:
+            print "Unknown measurement."
+            return
+        self._connection.send_sync("measurement:immed:type %s" % type)
+        self._connection.send_sync("measurement:gating cursor")
+        #self._connection.send_sync("measurement:immed:state on" % measurement)
 #### Trigger Settings ###############################################################################
     def set_untriggered(self):
         """ Set the scope to untriggered mode."""
@@ -156,8 +167,8 @@ class Tektronix(object):
             self._connection.send_sync("trigger:a:edge:slope fall") # Falling or ...
         else:
             self._connection.send_sync("trigger:a:edge:slope rise") # ... rising slope
-        self._connection.send_sync("trigger:a:level %f" % trigger_level) # Sets the trigger level in Volts
-        self._connection.send_sync("trigger:a:level:ch%i %f" % (channel, trigger_level)) # Sets the trigger level in Volts
+        self._connection.send_sync("trigger:a:level %e" % trigger_level) # Sets the trigger level in Volts
+        self._connection.send_sync("trigger:a:level:ch%i %e" % (channel, trigger_level)) # Sets the trigger level in Volts
     def get_trigger_frequency(self):
         trigger_frequency = float(self._connection.ask("trigger:frequency?"))
         if trigger_frequency > 9.0e+37: # NaN - weird value from scope
@@ -197,12 +208,13 @@ class Tektronix(object):
         timeform = self._preamble[channel]['XZERO'] + self._data_start * self._preamble[channel]['XINCR'] + \
             (numpy.arange(self._preamble[channel]['NR_PT']) - self._preamble[channel]['PT_OFF']) * self._preamble[channel]['XINCR']
         return timeform
-    def get_measurement(self, measurement):
+    def get_measurement(self, channel):
         """ Return the measurement value."""
-        value = self._connection.ask("measurement:meas%i:value?" % measurement)
-        if value == 2.8740E-06:
+        self._connection.send_sync("measurement:immed:source1 ch%i" % channel)
+        value = self._connection.ask("measurement:immed:value?")
+        if value == "2.8740E-06":
             return None
-        return value
+        return float(value)
 #### Internal ###################################################################################### 
     def _find_active_channels(self):
         """ Finds out how many channels are active."""
