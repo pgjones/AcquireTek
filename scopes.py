@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 #
 # scopes.py
@@ -134,6 +135,8 @@ class Tektronix(object):
             self._connection.send_sync("ch%i:invert off" % channel)
     def set_channel_coupling(self, channel, coupling="ac"):
         self._connection.send_sync("ch%i:coupling %s" % (channel, coupling))
+    def set_probe_gain(self, channel, gain):
+        self._connection.send_sync("ch%i:probe:gain %f" % (channel, gain))
 #### Acquisition Type ###############################################################################
     def set_single_acquisition(self):
         """ Set the scope in single acquisition mode."""

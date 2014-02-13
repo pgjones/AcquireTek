@@ -94,6 +94,7 @@ class HDF5File(File):
         """ Save of the data to a hdf5 file."""
         with h5py.File(file_path, "w") as file_:
             for key in self._meta_data.keys():
+                print "HDF5", key, self._meta_data[key]
                 file_.attrs[key] = self._meta_data[key]
             for channel in self._data.keys():
                 data = self._data[channel]

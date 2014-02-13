@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 #
 # single_acquisition_example.py
@@ -51,7 +52,7 @@ def single_acquisition_example(name, n_events, trigger, trigger_channel):
             time.sleep(10)
         if datetime.datetime.now() - last_save_time > datetime.timedelta(seconds=60):
             results.autosave()
-            last_save_time = time.time()
+            last_save_time = datetime.datetime.now()
     results.save()
     print "Finished at", time.strftime("%Y-%m-%d %H:%M:%S")
 
