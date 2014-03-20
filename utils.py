@@ -98,7 +98,10 @@ class HDF5File(File):
             for channel in self._data.keys():
                 data = self._data[channel]
                 for index, waveform in enumerate(data):
-                    file_.create_dataset("ch%i_%i" % (channel, index), data=waveform)                
+                    try:
+                        file_.create_dataset("ch%i_%i" % (channel, index), data=waveform)                
+                    except TypeError:
+                        pass
     def _load(self, file_path):
         """ Load the data from a hdf5 file."""
         with h5py.File(file_path, "r") as file_:
